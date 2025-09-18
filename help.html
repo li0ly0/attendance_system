@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Attendance Portal - Professor User Guide</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      background-color: #faf9f6;
+      color: #1e293b;
+      margin: 2rem auto;
+      max-width: 900px;
+      line-height: 1.6;
+      padding: 0 1rem;
+    }
+    h1, h2, h3, h4 {
+      color: #b91c1c; /* red-700 */
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-size: 2.25rem;
+      border-bottom: 3px solid #b91c1c;
+      padding-bottom: 0.25rem;
+    }
+    h2 {
+      font-size: 1.75rem;
+      border-bottom: 2px solid #fbbf24; /* yellow-400 */
+      padding-bottom: 0.25rem;
+    }
+    h3 {
+      font-size: 1.25rem;
+      margin-top: 1.5rem;
+    }
+    p {
+      margin-bottom: 1rem;
+    }
+    ul {
+      margin-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    th, td {
+      border: 1px solid #e2e8f0; /* slate-200 */
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    th {
+      background-color: #fef3c7; /* yellow-100 */
+      font-weight: 600;
+    }
+    code {
+      background-color: #fef3c7;
+      padding: 0.1rem 0.3rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+    }
+    .note {
+      background-color: #fef3c7;
+      border-left: 4px solid #fbbf24;
+      padding: 0.5rem 1rem;
+      margin: 1rem 0;
+      font-style: italic;
+    }
+    a {
+      color: #b91c1c;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>Attendance Portal - Professor User Guide</h1>
+
+  <section>
+    <h2>1. Dashboard Overview</h2>
+    <p>The <strong>Dashboard</strong> is your central hub to monitor student attendance across your subjects.</p>
+
+    <h3>Accessing the Dashboard</h3>
+    <ul>
+      <li>Log in with your credentials.</li>
+    </ul>
+
+    <h3>Dashboard Components</h3>
+    <ul>
+      <li><strong>Sidebar Navigation:</strong> Links to Dashboard, Scanner, Subjects, Help, and Logout.</li>
+      <li><strong>KPI Cards:</strong> Show counts of Present, Absent, and Late students for the selected date.</li>
+      <li><strong>Filters:</strong> Search by student ID or name, filter by subject, status, and date.</li>
+      <li><strong>Attendance Table:</strong> Displays detailed attendance records with color-coded status badges.</li>
+      <li><strong>Pagination:</strong> Navigate through records 5 at a time, respecting applied filters.</li>
+      <li><strong>New Scan:</strong> Button to open the scanner page for recording attendance.</li>
+    </ul>
+
+    <h3>Using Filters</h3>
+    <p>Use the filter form above the attendance table to narrow down records:</p>
+    <ul>
+      <li><strong>Search:</strong> Enter student ID or name.</li>
+      <li><strong>Subject:</strong> Select one of your subjects.</li>
+      <li><strong>Status:</strong> Filter by Present, Late, or Absent.</li>
+      <li><strong>Date:</strong> Choose a specific date.</li>
+      <li>Click <code>Apply</code> to filter or <code>Reset</code> to clear filters.</li>
+    </ul>
+
+    <h3>Attendance Table</h3>
+    <p>The table shows:</p>
+    <ul>
+      <li>Student ID and Name</li>
+      <li>Subject</li>
+      <li>Scan Time (when attendance was recorded)</li>
+      <li>Status with color-coded badges: green (Present), amber (Late), red (Absent)</li>
+    </ul>
+
+    <h3>Pagination</h3>
+    <p>Use the pagination controls below the table to navigate through pages of attendance records.</p>
+
+    <h3>Logging Out</h3>
+    <p>Use the <strong>Logout</strong> link in the sidebar to securely end your session.</p>
+  </section>
+
+  <section>
+    <h2>2. Attendance Scanner</h2>
+    <p>The <strong>Scanner</strong> page allows you to record attendance by scanning student QR codes.</p>
+
+    <h3>Starting a Scan Session</h3>
+    <ul>
+      <li>Select a subject by typing its name in the search box and choosing from suggestions.</li>
+      <li>Click <code>Start Scanning</code> to begin a new scan session.</li>
+      <li>The session stores the subject ID, start time, and initializes scanned students list.</li>
+    </ul>
+
+    <h3>Scanning Students</h3>
+    <ul>
+      <li>Camera preview with a yellow scan guide box appears.</li>
+      <li>Click <code>Start Scan</code> to activate the QR code scanner.</li>
+      <li>Position each student's QR code inside the yellow box for scanning.</li>
+      <li>Each scanned student is recorded as <code>Present</code> if scanned within 15 minutes of session start, otherwise <code>Late</code>.</li>
+      <li>Duplicate scans for the same student in the session are prevented.</li>
+      <li>Attendance status updates are sent automatically to students and guardians.</li>
+      <li>Click <code>Stop Scan</code> to pause scanning.</li>
+    </ul>
+
+    <h3>Ending the Scan Session</h3>
+    <ul>
+      <li>Click <code>End Scan Session</code> to finish scanning.</li>
+      <li>All enrolled students not scanned are marked <code>Absent</code> for the current date.</li>
+      <li>Session data is cleared after ending.</li>
+    </ul>
+
+    <h3>Troubleshooting & Tips</h3>
+    <ul>
+      <li>Allow camera access when prompted by your browser.</li>
+      <li>Ensure QR codes contain valid active student IDs enrolled in the selected subject.</li>
+      <li>If no camera is found, check your device and browser permissions.</li>
+      <li>Scanning works on desktop and mobile devices with cameras.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>3. Subjects Management</h2>
+    <p>The <strong>Subjects</strong> page lets you add new subjects, delete existing ones, and manage student enrollments.</p>
+
+    <h3>Adding a New Subject</h3>
+    <ul>
+      <li>Click the <code>Add Subject</code> button.</li>
+      <li>Enter the subject name in the modal form. Please Note: Inlcude the Section in the subject name.</li>
+      <li>Submit to add the subject linked to your account.</li>
+      <li>The page reloads showing your updated subject list.</li>
+    </ul>
+
+    <h3>Viewing and Managing Subjects</h3>
+    <ul>
+      <li>Your subjects appear as cards with the subject name.</li>
+      <li>Each card has buttons to <code>Enroll Students</code> and <code>Delete</code> the subject.</li>
+    </ul>
+
+    <h3>Enrolling Students</h3>
+    <ul>
+      <li>Click <code>Enroll Students</code> on a subject card to open the enrollment modal.</li>
+      <li>Search active students by name or ID; suggestions exclude already enrolled students.</li>
+      <li>Select a student and click <code>Enroll</code> to add them.</li>
+      <li>View and manage currently enrolled students in the modal.</li>
+      <li>Unenroll students by clicking <code>Unenroll</code> next to their name.</li>
+    </ul>
+
+    <h3>Deleting a Subject</h3>
+    <ul>
+      <li>Click <code>Delete</code> on a subject card.</li>
+      <li>Confirm deletion by typing the exact subject name in the modal.</li>
+      <li>Deletion removes the subject and all related enrollments permanently.</li>
+      <li>You will be redirected with a success message after deletion.</li>
+    </ul>
+
+    <h3>Important Notes</h3>
+    <ul>
+      <li>Only active students appear in enrollment searches.</li>
+      <li>Enrollment and unenrollment happen asynchronously without page reload.</li>
+      <li>Deletion requires exact name confirmation to prevent mistakes.</li>
+      <li>The interface is responsive and accessible on various devices.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>4. General Tips & Support</h2>
+    <ul>
+      <li>Use the sidebar to navigate between Dashboard, Scanner, Subjects, and Help pages.</li>
+      <li>Always log out securely using the <code>Logout</code> link.</li>
+      <li>If you encounter issues, check your internet connection and browser permissions.</li>
+      <li>Contact your system administrator for further assistance such as Password Reset.</li>
+    </ul>
+  </section>
+</body>
+</html>

@@ -1,0 +1,392 @@
+<?php
+require 'db.php';
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+if(!isset($_SESSION['professor_id'])) header("Location: index.php");
+
+// Fetch subjects for filter dropdown
+$subjectStmt = $pdo->prepare("SELECT * FROM subjects WHERE professor_id=?");
+$subjectStmt->execute([$_SESSION['professor_id']]);
+$subjects = $subjectStmt->fetchAll();
+
+// Initialize filter variables from GET parameters
+$date = $_GET['date'] ?? '';
+$subjectFilter = $_GET['subject'] ?? '';
+$statusFilter = $_GET['status'] ?? '';
+$search = trim($_GET['search'] ?? '');
+
+// Build base query and parameters
+$query = "SELECT a.*, s.name AS student_name, sub.name AS subject_name
+          FROM attendance_records a
+          JOIN students s ON a.student_id = s.student_id
+          JOIN subjects sub ON a.subject_id = sub.id
+          WHERE s.professor_id = ?";
+$params = [$_SESSION['professor_id']];
+
+// Add filters dynamically
+if ($date) {
+    $query .= " AND DATE(a.scan_time) = ?";
+    $params[] = $date;
+}
+if ($subjectFilter) {
+    $query .= " AND a.subject_id = ?";
+    $params[] = $subjectFilter;
+}
+if ($statusFilter) {
+    $query .= " AND a.status = ?";
+    $params[] = $statusFilter;
+}
+if ($search) {
+    $query .= " AND (s.student_id LIKE ? OR s.name LIKE ?)";
+    $searchParam = "%$search%";
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+}
+
+$query .= " ORDER BY a.scan_time DESC";
+
+$stmt = $pdo->prepare($query);
+$stmt->execute($params);
+$records = $stmt->fetchAll();
+
+// Determine the date to consider as "today" for counts
+$todayDate = $date ?: date('Y-m-d');
+
+// Build query to count statuses for the given date and subject filter
+$countQuery = "SELECT a.status, COUNT(*) as count
+               FROM attendance_records a
+               JOIN students s ON a.student_id = s.student_id
+               WHERE s.professor_id = ? AND DATE(a.scan_time) = ?";
+
+$countParams = [$_SESSION['professor_id'], $todayDate];
+
+if ($subjectFilter) {
+    $countQuery .= " AND a.subject_id = ?";
+    $countParams[] = $subjectFilter;
+}
+
+$countQuery .= " GROUP BY a.status";
+
+$countStmt = $pdo->prepare($countQuery);
+$countStmt->execute($countParams);
+$statusCounts = $countStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+$absentCount = $statusCounts['Absent'] ?? 0;
+$lateCount = $statusCounts['Late'] ?? 0;
+$presentCount = $statusCounts['Present'] ?? 0;
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Attendance Records</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f9fafb;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #60a5fa; /* blue-400 */
+        border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #3b82f6; /* blue-500 */
+    }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+<div class="flex h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+        <div class="h-16 flex items-center justify-center px-6 border-b border-gray-200">
+            <!-- Replaced Signpaper text and icon with picture -->
+            <img src="./logo.jpg" alt="Logo"/>
+        </div>
+        <nav class="flex-grow px-4 py-6 overflow-y-auto space-y-2" aria-label="Sidebar navigation">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Main Menu</h3>
+            <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-xl bg-blue-50 text-blue-700 shadow-sm transition-colors duration-150" aria-current="page">
+                <!-- Dashboard icon -->
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6" />
+                </svg>
+                <span class="ml-3">Dashboard</span>
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-xl text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
+                <!-- Scanner icon -->
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" ry="2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                    <line x1="3" y1="10" x2="21" y2="10" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                    <line x1="7" y1="16" x2="7" y2="16" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                </svg>
+                <span class="ml-3">Scanner</span>
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-xl text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
+                <!-- Students Database icon -->
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="7" r="4" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                    <path stroke-width="2" stroke-linejoin="round" stroke-linecap="round" d="M5.5 21a6.5 6.5 0 0113 0" />
+                </svg>
+                <span class="ml-3">Students Database</span>
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-xl text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
+                <!-- Subjects Database icon -->
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" ry="2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                    <path stroke-width="2" stroke-linejoin="round" stroke-linecap="round" d="M8 9h8M8 13h8M8 17h8" />
+                </svg>
+                <span class="ml-3">Subjects Database</span>
+            </a>
+        </nav>
+        <div class="p-4 border-t border-gray-200">
+            <nav class="space-y-1 mb-4" aria-label="Help and support">
+                <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-xl text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
+                   <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="ml-3">Help</span>
+                </a>
+                <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-xl text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-7 4a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    <span class="ml-3">Support Center</span>
+                </a>
+            </nav>
+            <!-- User info with logout dropdown -->
+            <div class="relative flex items-center space-x-3">
+                <img class="h-10 w-10 rounded-full object-cover shadow-sm" src="https://picsum.photos/id/433/100/100" alt="User   avatar">
+                <div>
+                    <p class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($_SESSION['professor_name'] ?? 'User  ') ?></p>
+                    <p class="text-xs text-gray-500"><?= htmlspecialchars($_SESSION['professor_email'] ?? 'Professor') ?></p>
+                </div>
+                <!-- Toggle button -->
+                <button id="userMenuButton" aria-haspopup="true" aria-expanded="false" aria-label="User   menu toggle"
+                    class="ml-auto text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 rounded">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                <!-- Dropdown menu positioned beside the icon -->
+                <div id="userMenuDropdown" class="hidden absolute top-0 left-full ml-2 w-32 bg-white rounded-xl shadow-lg border border-gray-200 z-10">
+                    <a href="logout.php" 
+                       class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-semibold rounded-t-xl focus:outline-none focus:bg-red-100"
+                       role="menuitem" tabindex="-1">
+                       Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto">
+        <div class="p-8 max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="flex items-center justify-between pb-6 border-b border-gray-200">
+                <h1 class="text-3xl font-extrabold text-gray-900">Attendance Records</h1>
+            </div>
+
+            <!-- Status Summary -->
+            <div class="flex gap-6 font-semibold text-gray-700 mt-6 mb-8" role="region" aria-label="Attendance status summary">
+                <span class="px-4 py-1 rounded-full bg-red-50 text-red-600" aria-live="polite">Absent Today: <?= $absentCount ?></span>
+                <span class="px-4 py-1 rounded-full bg-yellow-50 text-yellow-600" aria-live="polite">Late Today: <?= $lateCount ?></span>
+                <span class="px-4 py-1 rounded-full bg-green-50 text-green-600" aria-live="polite">Present Today: <?= $presentCount ?></span>
+            </div>
+
+            <!-- Filter Bar -->
+            <form method="GET" 
+                  class="bg-white rounded-xl shadow-sm p-5 flex flex-wrap items-center gap-4 mb-8 border border-gray-200"
+                  aria-label="Filter attendance records">
+
+                <!-- Search -->
+                <div class="flex items-center flex-grow max-w-md bg-gray-50 rounded-xl border border-gray-300 px-3 py-2 focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-200 transition">
+                    <svg class="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1110.5 3a7.5 7.5 0 016.15 13.65z"/>
+                    </svg>
+                    <input type="text" id="search" name="search" value="<?= htmlspecialchars($search) ?>" 
+                           placeholder="Search by ID or Name..." 
+                           class="flex-grow border-0 bg-transparent focus:ring-0 text-sm text-gray-700 placeholder-gray-400" />
+                </div>
+
+                <!-- Subject -->
+                <div>
+                    <select id="subject" name="subject" 
+                            class="w-44 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition">
+                        <option value="">All Subjects</option>
+                        <?php foreach($subjects as $sub): ?>
+                            <option value="<?= $sub['id'] ?>" <?= ($subjectFilter == $sub['id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($sub['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Status -->
+                <div>
+                    <select id="status" name="status" 
+                            class="w-36 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition">
+                        <option value="">All Statuses</option>
+                        <option value="Present" <?= ($statusFilter == 'Present') ? 'selected' : '' ?>>Present</option>
+                        <option value="Late" <?= ($statusFilter == 'Late') ? 'selected' : '' ?>>Late</option>
+                        <option value="Absent" <?= ($statusFilter == 'Absent') ? 'selected' : '' ?>>Absent</option>
+                    </select>
+                </div>
+
+                <!-- Date -->
+                <div class="flex flex-col">
+                    <input type="date" id="date" name="date" value="<?= htmlspecialchars($date) ?>"
+                           placeholder="Date"
+                           class="w-36 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition" />
+                </div>
+                <!-- Action Buttons -->
+                <div class="flex gap-3 ml-auto">
+                    <button type="submit" 
+                            class="px-6 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-semibold shadow-sm hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-1 transition">
+                        Search
+                    </button>
+                    <a href="<?= basename(__FILE__) ?>" 
+                       class="px-6 py-2 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-300 focus:ring-offset-1 transition">
+                        Reset
+                    </a>
+                </div>
+            </form>
+
+            <?php
+            // Pagination setup
+            $recordsPerPage = 5;
+            $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+            $totalRecords = count($records);
+            $totalPages = ceil($totalRecords / $recordsPerPage);
+            $offset = ($page - 1) * $recordsPerPage;
+            $recordsToShow = array_slice($records, $offset, $recordsPerPage);
+
+            // Build base query string for pagination links preserving filters except page
+            $queryParams = $_GET;
+            unset($queryParams['page']);
+            $baseQueryString = http_build_query($queryParams);
+            if ($baseQueryString !== '') {
+                $baseQueryString .= '&';
+            }
+            ?>
+
+                        <!-- Attendance Table -->
+            <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200" role="table" aria-describedby="attendanceTableDesc">
+                    <caption id="attendanceTableDesc" class="sr-only">List of attendance records filtered by selected criteria</caption>
+                    <thead class="bg-white border-b border-gray-200">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Student ID</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Subject</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Scan Time</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        <?php if (count($recordsToShow) === 0): ?>
+                            <tr>
+                                <td colspan="5" class="px-6 py-4 text-center text-gray-500 italic">No records found.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach($recordsToShow as $r): ?>
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium"><?= htmlspecialchars($r['student_id']) ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($r['student_name']) ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($r['subject_name']) ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($r['scan_time']) ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white
+                                            <?php
+                                                switch ($r['status']) {
+                                                    case 'Present': echo 'bg-green-400'; break;
+                                                    case 'Late': echo 'bg-yellow-400'; break;
+                                                    case 'Absent': echo 'bg-red-400'; break;
+                                                    default: echo 'bg-gray-300';
+                                                }
+                                            ?>">
+                                            <?= htmlspecialchars($r['status']) ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="mt-6 flex justify-between items-center text-sm text-gray-600">
+                <div>Showing <?= count($recordsToShow) ?> of <?= $totalRecords ?> records</div>
+                <nav aria-label="Pagination navigation" class="space-x-1">
+                    <?php if ($page > 1): ?>
+                        <a href="?<?= $baseQueryString ?>page=<?= $page - 1 ?>" class="px-3 py-1 rounded-xl border border-gray-300 hover:bg-gray-100">Previous</a>
+                    <?php else: ?>
+                        <span class="px-3 py-1 rounded-xl border border-gray-300 text-gray-400 cursor-not-allowed">Previous</span>
+                    <?php endif; ?>
+
+                    <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                        <?php if ($i == $page): ?>
+                            <span class="px-3 py-1 rounded-xl border border-blue-600 bg-blue-600 text-white"><?= $i ?></span>
+                        <?php else: ?>
+                            <a href="?<?= $baseQueryString ?>page=<?= $i ?>" class="px-3 py-1 rounded-xl border border-gray-300 hover:bg-gray-100"><?= $i ?></a>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a href="?<?= $baseQueryString ?>page=<?= $page + 1 ?>" class="px-3 py-1 rounded-xl border border-gray-300 hover:bg-gray-100">Next</a>
+                    <?php else: ?>
+                        <span class="px-3 py-1 rounded-xl border border-gray-300 text-gray-400 cursor-not-allowed">Next</span>
+                    <?php endif; ?>
+                </nav>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const button = document.getElementById('userMenuButton');
+        const dropdown = document.getElementById('userMenuDropdown');
+
+        button.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const isHidden = dropdown.classList.contains('hidden');
+            if (isHidden) {
+                dropdown.classList.remove('hidden');
+                button.setAttribute('aria-expanded', 'true');
+            } else {
+                dropdown.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        // Close dropdown if clicking outside
+        document.addEventListener('click', function () {
+            if (!dropdown.classList.contains('hidden')) {
+                dropdown.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        // Close dropdown on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !dropdown.classList.contains('hidden')) {
+                dropdown.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+                button.focus();
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
